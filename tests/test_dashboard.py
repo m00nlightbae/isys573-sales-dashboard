@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from dashboard import load_data, build_region_bar, build_monthly_line, \
-                      build_category_pie, build_top_products
+                      build_category_pie, build_top_products, build_rep_leaderboard
 
 DATA_PATH = Path(__file__).parent.parent / "data" / "sales.csv"
 
@@ -109,3 +109,38 @@ class TestTopProducts:
         fig = build_top_products(df)
         revenues = list(fig.data[0].x)
         assert revenues == sorted(revenues)
+
+
+class TestRepLeaderboard:
+    def test_returns_figure(self, df) -> None:
+        """Test that build_rep_leaderboard returns a valid Plotly Figure."""
+        fig = build_rep_leaderboard(df)
+        assert fig is not None
+
+    def test_has_bar_chart_trace(self, df) -> None:
+        """Test that the leaderboard is a horizontal bar chart."""
+        fig = build_rep_leaderboard(df)
+        assert len(fig.data) >= 1
+        # Verify it's a bar chart with horizontal orientation
+        assert fig.data[0].orientation == "h"
+
+    def test_respects_quarter_filter(self, df) -> None:
+        """Test that leaderboard updates when filtered by quarter."""
+        q1_data = df[df["quarter"] == "Q1"]
+        fig_q1 = build_rep_leaderboard(q1_data)
+        
+        # Q1 should have fewer or equal sales reps represented than full year
+        assert len(fig_q1.data[0].y) <= len(build_rep_leaderboard(df).data[0].y)
+
+    def test_sorted_descending_by_revenue(self, df) -> None:
+        """Test that sales reps are sorted by revenue (ascending x for horizontal bar)."""
+        fig = build_rep_leaderboard(df)
+        revenues = list(fig.data[0].x)
+        # Should be sorted ascending (for horizontal bar, largest at top)
+        assert revenues == sorted(revenues)
+
+    def test_hover_template_contains_revenue(self, df) -> None:
+        """Test that hover template includes revenue data."""
+        fig = build_rep_leaderboard(df)
+        hover = fig.data[0].hovertemplate
+        assert "Revenue" in hover or "revenue" in hover or "$" in hover
