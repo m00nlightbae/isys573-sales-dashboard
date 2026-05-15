@@ -7,6 +7,7 @@ Reads data/sales.csv and generates an interactive HTML report with:
   - Monthly revenue trend (line chart)
   - Revenue by category (pie chart)
   - Top 10 products by revenue (horizontal bar)
+  - Sales rep leaderboard (horizontal bar chart)
   - Summary KPI cards
 
 Usage:
@@ -142,6 +143,57 @@ def build_top_products(df: pd.DataFrame, n: int = 10) -> go.Figure:
     return fig
 
 
+def build_rep_leaderboard(df: pd.DataFrame) -> go.Figure:
+    """
+    Sales rep performance leaderboard — horizontal bar chart.
+    
+    Shows total revenue per sales rep, sorted in descending order.
+    This helps regional managers identify top performers and allocate resources.
+    
+    Args:
+        df: DataFrame with 'revenue' column and a sales rep identifier column.
+        
+    Returns:
+        A Plotly Figure object displaying a horizontal bar chart of sales reps
+        ranked by total revenue (highest at top).
+    """
+    # TODO: Determine the sales rep identifier column name from the data
+    # (it may be 'sales_rep', 'rep_name', 'representative', etc.)
+    # For now, assuming a column exists. Adjust as needed based on data structure.
+    
+    # Group by sales rep and sum revenue, then sort descending
+    rep_summary = (
+        df.groupby("sales_rep")["revenue"]  # Replace 'sales_rep' with actual column name
+        .sum()
+        .reset_index()
+        .sort_values("revenue", ascending=True)  # ascending for horizontal bar (largest at top)
+    )
+    
+    # Define color palette
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+              "#8c564b", "#e377c2", "#7f7f7f"]
+    
+    # Create horizontal bar chart
+    fig = go.Figure(go.Bar(
+        x=rep_summary["revenue"],
+        y=rep_summary["sales_rep"],
+        orientation="h",
+        marker_color=colors[:len(rep_summary)],
+        hovertemplate="<b>%{y}</b><br>Revenue: $%{x:,.0f}<extra></extra>",
+    ))
+    
+    fig.update_layout(
+        title="Sales Rep Leaderboard",
+        plot_bgcolor="white",
+        xaxis=dict(tickprefix="$", tickformat=",.0f", title="Total Revenue ($)"),
+        yaxis=dict(title="Sales Rep"),
+        showlegend=False,
+        margin=dict(t=50, b=30, l=120),
+    )
+    
+    return fig
+
+
 def kpi_card_html(label: str, value: str, color: str = "#2196F3") -> str:
     """Render a single KPI card as HTML."""
     return f"""
@@ -174,6 +226,7 @@ def build_html(df: pd.DataFrame) -> str:
                 "monthly": empty.to_json(),
                 "category": empty.to_json(),
                 "top_products": empty.to_json(),
+                "rep_leaderboard": empty.to_json(),
                 "total_revenue": "$0",
                 "total_orders": "0",
                 "avg_order": "$0",
@@ -190,10 +243,11 @@ def build_html(df: pd.DataFrame) -> str:
         )
 
         chart_data[q] = {
-            "region":       build_region_bar(subset).to_json(),
-            "monthly":      build_monthly_line(subset).to_json(),
-            "category":     build_category_pie(subset).to_json(),
-            "top_products": build_top_products(subset).to_json(),
+            "region":          build_region_bar(subset).to_json(),
+            "monthly":         build_monthly_line(subset).to_json(),
+            "category":        build_category_pie(subset).to_json(),
+            "top_products":    build_top_products(subset).to_json(),
+            "rep_leaderboard": build_rep_leaderboard(subset).to_json(),
             "total_revenue": f"${total_rev:,.0f}",
             "total_orders":  f"{total_orders:,}",
             "avg_order":     f"${avg_order:,.0f}",
@@ -264,6 +318,7 @@ def build_html(df: pd.DataFrame) -> str:
   <div class="chart-card"><div id="chartMonthly" style="height:340px;"></div></div>
   <div class="chart-card"><div id="chartCategory"    style="height:340px;"></div></div>
   <div class="chart-card"><div id="chartTopProducts" style="height:340px;"></div></div>
+  <div class="chart-card"><div id="chartRepLeaderboard" style="height:340px;"></div></div>
 </div>
 
 <footer>
@@ -298,6 +353,7 @@ function applyFilter(quarter) {{
   Plotly.react("chartMonthly",     JSON.parse(d.monthly).data,     JSON.parse(d.monthly).layout,     {{responsive:true}});
   Plotly.react("chartCategory",    JSON.parse(d.category).data,    JSON.parse(d.category).layout,    {{responsive:true}});
   Plotly.react("chartTopProducts", JSON.parse(d.top_products).data, JSON.parse(d.top_products).layout, {{responsive:true}});
+  Plotly.react("chartRepLeaderboard", JSON.parse(d.rep_leaderboard).data, JSON.parse(d.rep_leaderboard).layout, {{responsive:true}});
 
   document.getElementById("filterLabel").textContent =
     quarter === "Full Year" ? "Showing all 2024 data" : `Showing ${{quarter}} 2024 only`;
